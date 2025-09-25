@@ -3,12 +3,13 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useParams, useNavigate } 
 import Navigation from './components/Navigation'
 import Landing from './components/Landing'
 import Footer from './components/Footer'
+import Admin from './components/Admin'
 import './App.css'
 
 function LandingPage() {
   return (
     <div className="relative w-full min-h-screen">
-      <Navigation />
+      <Navigation /> 
       <Landing />
       <Footer />
     </div>
@@ -267,6 +268,7 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth/login" element={<div className="p-6">Login form…</div>} />
         <Route path="/auth/register" element={<div className="p-6">Register form…</div>} />
+        <Route path="/admin/login" element={<Admin />} />
         <Route path="/app/*" element={<AppShell />} />
       </Routes>
     </BrowserRouter>
