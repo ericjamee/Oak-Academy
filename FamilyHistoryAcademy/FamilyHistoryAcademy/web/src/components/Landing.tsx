@@ -24,6 +24,9 @@ export default function Landing() {
               <span className="block bg-gradient-to-r from-blue-200 via-white to-blue-200 bg-clip-text text-transparent">
                 & Genealogy Tools
               </span>
+              <span className="block bg-gradient-to-r from-blue-200 via-white to-blue-200 bg-clip-text text-transparent">
+                
+              </span>
             </h1>
             
             {/* Subtitle */}

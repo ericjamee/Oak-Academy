@@ -9,6 +9,12 @@ interface AdminUser {
   name: string;
   email: string;
   role: UserRole;
+  joinedDate: string;
+  lastActive: string;
+  coursesCompleted: number;
+  coursesInProgress: number;
+  badgesEarned: number;
+  totalProgress: number; // percentage
 }
 
 // Course and Badge definitions
@@ -55,7 +61,13 @@ const currentUser: AdminUser = {
   id: '1',
   name: 'Super Admin User',
   email: 'superadmin@example.com',
-  role: 'super_admin' // Change this to 'admin' or 'student' to test different permission levels
+  role: 'super_admin', // Change this to 'admin' or 'student' to test different permission levels
+  joinedDate: '2024-01-01',
+  lastActive: '2024-01-26',
+  coursesCompleted: 3,
+  coursesInProgress: 0,
+  badgesEarned: 2,
+  totalProgress: 100
 };
 
 // Permission helper functions
@@ -67,6 +79,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState('users');
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [showBadgeForm, setShowBadgeForm] = useState(false);
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [notifications] = useState([
     { id: '1', message: 'John Smith completed "Intermediate User Badge"', time: '2 hours ago', type: 'badge_completed' },
     { id: '2', message: 'New course "Advanced Research" was published', time: '1 day ago', type: 'course_published' }
@@ -78,6 +91,48 @@ export default function Admin() {
   const [courseDuration, setCourseDuration] = useState('');
   const [courseContent, setCourseContent] = useState<CourseContent[]>([]);
   const [showContentTypeSelector, setShowContentTypeSelector] = useState(false);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
+  // Course templates
+  const courseTemplates = [
+    {
+      id: 'basic-video',
+      name: 'Basic Video Course',
+      description: 'Simple course with intro video and quiz',
+      icon: '📹',
+      content: [
+        { type: 'video', title: 'Introduction', placeholder: 'Course introduction video' },
+        { type: 'reading', title: 'Course Materials', placeholder: 'Additional reading materials and resources' },
+        { type: 'quiz', title: 'Knowledge Check', placeholder: 'Test understanding of key concepts' }
+      ]
+    },
+    {
+      id: 'comprehensive',
+      name: 'Comprehensive Course',
+      description: 'Full course with multiple modules',
+      icon: '📚',
+      content: [
+        { type: 'video', title: 'Course Overview', placeholder: 'Welcome and course objectives' },
+        { type: 'reading', title: 'Module 1: Fundamentals', placeholder: 'Core concepts and principles' },
+        { type: 'video', title: 'Module 1 Demo', placeholder: 'Practical demonstration' },
+        { type: 'quiz', title: 'Module 1 Quiz', placeholder: 'Test Module 1 knowledge' },
+        { type: 'reading', title: 'Module 2: Advanced Topics', placeholder: 'Advanced concepts and techniques' },
+        { type: 'video', title: 'Module 2 Demo', placeholder: 'Advanced demonstration' },
+        { type: 'quiz', title: 'Final Assessment', placeholder: 'Comprehensive final quiz' }
+      ]
+    },
+    {
+      id: 'quick-tutorial',
+      name: 'Quick Tutorial',
+      description: 'Short tutorial with practice',
+      icon: '⚡',
+      content: [
+        { type: 'video', title: 'Tutorial Video', placeholder: 'Step-by-step tutorial' },
+        { type: 'reading', title: 'Practice Exercise', placeholder: 'Hands-on practice instructions' }
+      ]
+    }
+  ];
 
   // Helper functions for course content management
   const addContentItem = (type: 'video' | 'reading' | 'quiz') => {
@@ -104,6 +159,46 @@ export default function Admin() {
     setCourseContent(courseContent.filter(item => item.id !== id));
   };
 
+  const moveContentItem = (fromIndex: number, toIndex: number) => {
+    const newContent = [...courseContent];
+    const [movedItem] = newContent.splice(fromIndex, 1);
+    newContent.splice(toIndex, 0, movedItem);
+    setCourseContent(newContent);
+  };
+
+  const duplicateContentItem = (id: string) => {
+    const item = courseContent.find(item => item.id === id);
+    if (item) {
+      const duplicatedItem = {
+        ...item,
+        id: Date.now().toString(),
+        title: `${item.title} (Copy)`
+      };
+      const index = courseContent.findIndex(item => item.id === id);
+      const newContent = [...courseContent];
+      newContent.splice(index + 1, 0, duplicatedItem);
+      setCourseContent(newContent);
+    }
+  };
+
+  const applyTemplate = (templateId: string) => {
+    const template = courseTemplates.find(t => t.id === templateId);
+    if (template) {
+      const templateContent = template.content.map((item, index) => ({
+        id: `template-${Date.now()}-${index}`,
+        type: item.type as 'video' | 'reading' | 'quiz',
+        title: item.title,
+        content: item.placeholder,
+        required: true,
+        ...(item.type === 'video' && { videoUrl: '' }),
+        ...(item.type === 'quiz' && { questions: [] })
+      }));
+      setCourseContent(templateContent);
+      setSelectedTemplate(templateId);
+      setShowTemplateSelector(false);
+    }
+  };
+
   const resetCourseForm = () => {
     setCourseTitle('');
     setCourseDescription('');
@@ -111,6 +206,8 @@ export default function Admin() {
     setCourseContent([]);
     setShowCourseForm(false);
     setShowContentTypeSelector(false);
+    setShowTemplateSelector(false);
+    setSelectedTemplate('');
   };
   
   // Sample courses data
@@ -181,6 +278,94 @@ export default function Admin() {
       createdAt: '2024-01-18',
       status: 'draft',
       studentsEarned: 0
+    }
+  ]);
+
+  // Sample users data with detailed progress
+  const [users] = useState<AdminUser[]>([
+    { 
+      id: '1', 
+      name: 'John Smith', 
+      email: 'john@example.com', 
+      role: 'student',
+      joinedDate: '2024-01-10',
+      lastActive: '2024-01-25',
+      coursesCompleted: 2,
+      coursesInProgress: 1,
+      badgesEarned: 1,
+      totalProgress: 75
+    },
+    { 
+      id: '2', 
+      name: 'Jane Doe', 
+      email: 'jane@example.com', 
+      role: 'admin',
+      joinedDate: '2024-01-05',
+      lastActive: '2024-01-26',
+      coursesCompleted: 3,
+      coursesInProgress: 0,
+      badgesEarned: 2,
+      totalProgress: 100
+    },
+    { 
+      id: '3', 
+      name: 'Mike Johnson', 
+      email: 'mike@example.com', 
+      role: 'student',
+      joinedDate: '2024-01-15',
+      lastActive: '2024-01-24',
+      coursesCompleted: 1,
+      coursesInProgress: 2,
+      badgesEarned: 0,
+      totalProgress: 45
+    },
+    { 
+      id: '4', 
+      name: 'Sarah Wilson', 
+      email: 'sarah@example.com', 
+      role: 'super_admin',
+      joinedDate: '2024-01-01',
+      lastActive: '2024-01-26',
+      coursesCompleted: 3,
+      coursesInProgress: 0,
+      badgesEarned: 2,
+      totalProgress: 100
+    },
+    { 
+      id: '5', 
+      name: 'Tom Brown', 
+      email: 'tom@example.com', 
+      role: 'admin',
+      joinedDate: '2024-01-08',
+      lastActive: '2024-01-25',
+      coursesCompleted: 2,
+      coursesInProgress: 1,
+      badgesEarned: 1,
+      totalProgress: 80
+    },
+    { 
+      id: '6', 
+      name: 'Emily Davis', 
+      email: 'emily@example.com', 
+      role: 'student',
+      joinedDate: '2024-01-20',
+      lastActive: '2024-01-26',
+      coursesCompleted: 0,
+      coursesInProgress: 1,
+      badgesEarned: 0,
+      totalProgress: 20
+    },
+    { 
+      id: '7', 
+      name: 'Robert Chen', 
+      email: 'robert@example.com', 
+      role: 'student',
+      joinedDate: '2024-01-12',
+      lastActive: '2024-01-23',
+      coursesCompleted: 3,
+      coursesInProgress: 0,
+      badgesEarned: 2,
+      totalProgress: 100
     }
   ]);
 
@@ -356,68 +541,223 @@ export default function Admin() {
                 {/* User List */}
                 <div className="bg-white/5 rounded-xl border border-white/10">
                   <div className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm font-medium text-white/80 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4 text-sm font-medium text-white/80 mb-4">
                       <div>User</div>
-                      <div>Email</div>
                       <div>Role</div>
+                      <div>Progress</div>
+                      <div>Courses</div>
+                      <div>Badges</div>
                       <div>Actions</div>
                     </div>
                     
-                    {/* Sample Users */}
-                    {[
-                      { id: '1', name: 'John Smith', email: 'john@example.com', role: 'student' as UserRole },
-                      { id: '2', name: 'Jane Doe', email: 'jane@example.com', role: 'admin' as UserRole },
-                      { id: '3', name: 'Mike Johnson', email: 'mike@example.com', role: 'student' as UserRole },
-                      { id: '4', name: 'Sarah Wilson', email: 'sarah@example.com', role: 'super_admin' as UserRole },
-                      { id: '5', name: 'Tom Brown', email: 'tom@example.com', role: 'admin' as UserRole }
-                    ].map((user, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 py-3 border-t border-white/10 first:border-t-0 items-center">
-                        <div className="text-white font-medium">{user.name}</div>
-                        <div className="text-white/80">{user.email}</div>
-                        <div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            user.role === 'super_admin' 
-                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                              : user.role === 'admin' 
-                              ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
-                              : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                          }`}>
-                            {user.role === 'super_admin' ? 'Super Admin' : 
-                             user.role === 'admin' ? 'Admin' : 'Student'}
-                          </span>
-                        </div>
-                        <div className="flex space-x-2">
-                          {canManageAdmins(currentUser.role) ? (
-                            <>
-                              {user.role === 'student' && (
-                                <select className="px-2 py-1 bg-slate-700 text-white text-xs rounded border border-white/20">
-                                  <option value="">Promote to...</option>
-                                  <option value="admin">Admin</option>
-                                  <option value="super_admin">Super Admin</option>
-                                </select>
-                              )}
-                              {user.role !== 'student' && user.id !== currentUser.id && (
-                                <button className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded-lg transition-colors duration-200">
-                                  Demote
-                                </button>
-                              )}
-                              {user.id !== currentUser.id && (
-                                <button className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg transition-colors duration-200">
-                                  Remove
-                                </button>
-                              )}
-                              {user.id === currentUser.id && (
-                                <span className="px-3 py-1 bg-white/10 text-white/60 text-xs rounded-lg">
-                                  You
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="px-3 py-1 bg-white/10 text-white/60 text-xs rounded-lg">
-                              View Only
+                    {/* User List with Progress Data */}
+                    {users.map((user) => (
+                      <div key={user.id} className="border-t border-white/10 first:border-t-0">
+                        {/* Main User Row */}
+                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 py-4 items-center">
+                          <div className="flex items-center space-x-3">
+                            <button
+                              onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
+                              className="text-white/60 hover:text-white transition-colors"
+                            >
+                              <svg 
+                                className={`w-4 h-4 transition-transform ${expandedUser === user.id ? 'rotate-90' : ''}`}
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                            <div>
+                              <div className="text-white font-medium">{user.name}</div>
+                              <div className="text-white/60 text-xs">{user.email}</div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              user.role === 'super_admin' 
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                                : user.role === 'admin' 
+                                ? 'bg-red-500/20 text-red-300 border border-red-500/30' 
+                                : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                            }`}>
+                              {user.role === 'super_admin' ? 'Super Admin' : 
+                               user.role === 'admin' ? 'Admin' : 'Student'}
                             </span>
-                          )}
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-xs text-white/80">
+                              <span>Overall</span>
+                              <span>{user.totalProgress}%</span>
+                            </div>
+                            <div className="w-full bg-white/20 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-blue-500 to-emerald-500 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${user.totalProgress}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          <div className="text-center">
+                            <div className="text-white font-medium">{user.coursesCompleted + user.coursesInProgress}</div>
+                            <div className="text-white/60 text-xs">
+                              {user.coursesCompleted} completed, {user.coursesInProgress} active
+                            </div>
+                          </div>
+                          
+                          <div className="text-center">
+                            <div className="text-white font-medium">{user.badgesEarned}</div>
+                            <div className="text-white/60 text-xs">badges earned</div>
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            {canManageAdmins(currentUser.role) ? (
+                              <>
+                                {user.role === 'student' && (
+                                  <select className="px-2 py-1 bg-slate-700 text-white text-xs rounded border border-white/20">
+                                    <option value="">Promote to...</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="super_admin">Super Admin</option>
+                                  </select>
+                                )}
+                                {user.role !== 'student' && user.id !== currentUser.id && (
+                                  <button className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded-lg transition-colors duration-200">
+                                    Demote
+                                  </button>
+                                )}
+                                {user.id !== currentUser.id && (
+                                  <button className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg transition-colors duration-200">
+                                    Remove
+                                  </button>
+                                )}
+                                {user.id === currentUser.id && (
+                                  <span className="px-3 py-1 bg-white/10 text-white/60 text-xs rounded-lg">
+                                    You
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="px-3 py-1 bg-white/10 text-white/60 text-xs rounded-lg">
+                                View Only
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        
+                        {/* Expanded Details */}
+                        {expandedUser === user.id && (
+                          <div className="px-4 pb-4 ml-8">
+                            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Account Info */}
+                                <div>
+                                  <h4 className="text-white font-medium mb-3 flex items-center">
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                    Account Details
+                                  </h4>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-white/60">Joined:</span>
+                                      <span className="text-white">{new Date(user.joinedDate).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-white/60">Last Active:</span>
+                                      <span className="text-white">{new Date(user.lastActive).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-white/60">Email:</span>
+                                      <span className="text-white">{user.email}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Course Progress */}
+                                <div>
+                                  <h4 className="text-white font-medium mb-3 flex items-center">
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                    Course Progress
+                                  </h4>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-white/60">Completed:</span>
+                                      <span className="text-emerald-400 font-medium">{user.coursesCompleted}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-white/60">In Progress:</span>
+                                      <span className="text-blue-400 font-medium">{user.coursesInProgress}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-white/60">Total Enrolled:</span>
+                                      <span className="text-white font-medium">{user.coursesCompleted + user.coursesInProgress}</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Sample course list */}
+                                  <div className="mt-3 space-y-1">
+                                    {user.coursesCompleted > 0 && (
+                                      <div className="text-xs text-emerald-400">
+                                        ✓ FamilySearch Memories
+                                      </div>
+                                    )}
+                                    {user.coursesCompleted > 1 && (
+                                      <div className="text-xs text-emerald-400">
+                                        ✓ SourceLinker Basics
+                                      </div>
+                                    )}
+                                    {user.coursesInProgress > 0 && (
+                                      <div className="text-xs text-blue-400">
+                                        ⏳ Reverse Indexing Techniques
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Badges */}
+                                <div>
+                                  <h4 className="text-white font-medium mb-3 flex items-center">
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                                    </svg>
+                                    Badges Earned
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {user.badgesEarned > 0 ? (
+                                      <div className="space-y-2">
+                                        {user.badgesEarned >= 1 && (
+                                          <div className="flex items-center space-x-2">
+                                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs">
+                                              🏆
+                                            </div>
+                                            <span className="text-white text-sm">Intermediate User Badge</span>
+                                          </div>
+                                        )}
+                                        {user.badgesEarned >= 2 && (
+                                          <div className="flex items-center space-x-2">
+                                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-xs">
+                                              🔍
+                                            </div>
+                                            <span className="text-white text-sm">Research Expert Badge</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="text-white/60 text-sm">
+                                        No badges earned yet
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -457,6 +797,48 @@ export default function Admin() {
                       </svg>
                     </button>
                   </div>
+
+                  {/* Template Selector */}
+                  {courseContent.length === 0 && (
+                    <div className="mb-6 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-white font-medium">Quick Start with Templates</h4>
+                          <p className="text-white/70 text-sm">Choose a template to get started faster, or start from scratch</p>
+                        </div>
+                        <button
+                          onClick={() => setShowTemplateSelector(!showTemplateSelector)}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors duration-200"
+                        >
+                          {showTemplateSelector ? 'Hide Templates' : 'View Templates'}
+                        </button>
+                      </div>
+                      
+                      {showTemplateSelector && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {courseTemplates.map((template) => (
+                            <button
+                              key={template.id}
+                              onClick={() => applyTemplate(template.id)}
+                              className="text-left p-4 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all duration-200 group"
+                            >
+                              <div className="flex items-center space-x-3 mb-2">
+                                <span className="text-2xl">{template.icon}</span>
+                                <h5 className="text-white font-medium group-hover:text-blue-300">{template.name}</h5>
+                              </div>
+                              <p className="text-white/60 text-sm mb-3">{template.description}</p>
+                              <div className="flex items-center text-xs text-white/50">
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                {template.content.length} content items
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   
                   {/* Course Basic Info */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -486,7 +868,12 @@ export default function Admin() {
                   {/* Course Content Builder */}
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-white font-medium">Course Content</h4>
+                      <div>
+                        <h4 className="text-white font-medium">Course Content</h4>
+                        {courseContent.length > 0 && (
+                          <p className="text-white/60 text-sm mt-1">{courseContent.length} content items • Drag to reorder</p>
+                        )}
+                      </div>
                       <button 
                         onClick={() => setShowContentTypeSelector(!showContentTypeSelector)}
                         className="flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition-colors duration-200"
@@ -537,10 +924,19 @@ export default function Admin() {
                     {/* Content Items */}
                     <div className="space-y-4">
                       {courseContent.map((item, index) => (
-                        <div key={item.id} className="bg-white/5 rounded-xl border border-white/10 p-4">
+                        <div key={item.id} className="bg-white/5 rounded-xl border border-white/10 p-4 group">
                           <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-white/60 text-sm">#{index + 1}</span>
+                            <div className="flex items-center space-x-3">
+                              {/* Drag Handle */}
+                              <div className="flex flex-col space-y-1 cursor-move text-white/40 hover:text-white/60">
+                                <div className="w-1 h-1 bg-current rounded-full"></div>
+                                <div className="w-1 h-1 bg-current rounded-full"></div>
+                                <div className="w-1 h-1 bg-current rounded-full"></div>
+                                <div className="w-1 h-1 bg-current rounded-full"></div>
+                                <div className="w-1 h-1 bg-current rounded-full"></div>
+                                <div className="w-1 h-1 bg-current rounded-full"></div>
+                              </div>
+                              <span className="text-white/60 text-sm font-medium">#{index + 1}</span>
                               <span className={`px-2 py-1 rounded text-xs font-medium ${
                                 item.type === 'video' ? 'bg-blue-500/20 text-blue-300' :
                                 item.type === 'reading' ? 'bg-green-500/20 text-green-300' :
@@ -550,14 +946,52 @@ export default function Admin() {
                                  item.type === 'reading' ? '📖 Reading' : '📝 Quiz'}
                               </span>
                             </div>
-                            <button
-                              onClick={() => removeContentItem(item.id)}
-                              className="text-red-400 hover:text-red-300"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
+                            <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              {/* Move Up */}
+                              {index > 0 && (
+                                <button
+                                  onClick={() => moveContentItem(index, index - 1)}
+                                  className="text-white/60 hover:text-white p-1"
+                                  title="Move up"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                  </svg>
+                                </button>
+                              )}
+                              {/* Move Down */}
+                              {index < courseContent.length - 1 && (
+                                <button
+                                  onClick={() => moveContentItem(index, index + 1)}
+                                  className="text-white/60 hover:text-white p-1"
+                                  title="Move down"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                              )}
+                              {/* Duplicate */}
+                              <button
+                                onClick={() => duplicateContentItem(item.id)}
+                                className="text-white/60 hover:text-white p-1"
+                                title="Duplicate"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </button>
+                              {/* Delete */}
+                              <button
+                                onClick={() => removeContentItem(item.id)}
+                                className="text-red-400 hover:text-red-300 p-1"
+                                title="Delete"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
                           
                           <input
@@ -592,10 +1026,88 @@ export default function Admin() {
                           
                           {item.type === 'quiz' && (
                             <div className="mt-3 p-3 bg-white/5 rounded-lg border border-white/10">
-                              <p className="text-white/80 text-sm mb-2">Quiz Questions (coming soon)</p>
-                              <button className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded">
-                                Add Question
-                              </button>
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-white/80 text-sm">Quiz Questions</p>
+                                <button 
+                                  onClick={() => {
+                                    const questions = item.questions || [];
+                                    const newQuestion = {
+                                      question: '',
+                                      options: ['', '', '', ''],
+                                      correctAnswer: 0
+                                    };
+                                    updateContentItem(item.id, { 
+                                      questions: [...questions, newQuestion] 
+                                    });
+                                  }}
+                                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors duration-200"
+                                >
+                                  Add Question
+                                </button>
+                              </div>
+                              
+                              {item.questions && item.questions.length > 0 ? (
+                                <div className="space-y-3">
+                                  {item.questions.map((q, qIndex) => (
+                                    <div key={qIndex} className="p-3 bg-white/5 rounded border border-white/10">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="text-white/60 text-xs">Question {qIndex + 1}</span>
+                                        <button
+                                          onClick={() => {
+                                            const questions = [...(item.questions || [])];
+                                            questions.splice(qIndex, 1);
+                                            updateContentItem(item.id, { questions });
+                                          }}
+                                          className="text-red-400 hover:text-red-300 text-xs"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                      <input
+                                        type="text"
+                                        placeholder="Enter your question..."
+                                        value={q.question}
+                                        onChange={(e) => {
+                                          const questions = [...(item.questions || [])];
+                                          questions[qIndex].question = e.target.value;
+                                          updateContentItem(item.id, { questions });
+                                        }}
+                                        className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-white/60 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 mb-2"
+                                      />
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {q.options.map((option, optIndex) => (
+                                          <div key={optIndex} className="flex items-center space-x-2">
+                                            <input
+                                              type="radio"
+                                              name={`question-${qIndex}`}
+                                              checked={q.correctAnswer === optIndex}
+                                              onChange={() => {
+                                                const questions = [...(item.questions || [])];
+                                                questions[qIndex].correctAnswer = optIndex;
+                                                updateContentItem(item.id, { questions });
+                                              }}
+                                              className="text-purple-600"
+                                            />
+                                            <input
+                                              type="text"
+                                              placeholder={`Option ${optIndex + 1}`}
+                                              value={option}
+                                              onChange={(e) => {
+                                                const questions = [...(item.questions || [])];
+                                                questions[qIndex].options[optIndex] = e.target.value;
+                                                updateContentItem(item.id, { questions });
+                                              }}
+                                              className="flex-1 px-2 py-1 bg-white/10 border border-white/20 rounded text-white placeholder-white/60 text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-white/50 text-xs text-center py-2">No questions added yet</p>
+                              )}
                             </div>
                           )}
                           
@@ -624,12 +1136,48 @@ export default function Admin() {
                     </div>
                   </div>
                   
-                  <div className="flex space-x-3">
+                  {/* Progress Indicator */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between text-sm text-white/80 mb-2">
+                      <span>Course Completion</span>
+                      <span>{Math.round(((courseTitle ? 1 : 0) + (courseDescription ? 1 : 0) + (courseContent.length > 0 ? 1 : 0) + (courseDuration ? 1 : 0)) / 4 * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-white/20 rounded-full h-2">
+                      <div 
+                        className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${((courseTitle ? 1 : 0) + (courseDescription ? 1 : 0) + (courseContent.length > 0 ? 1 : 0) + (courseDuration ? 1 : 0)) / 4 * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3">
                     <button 
                       disabled={!courseTitle || !courseDescription || courseContent.length === 0}
-                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200"
+                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center"
                     >
-                      Create Course
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Save as Draft
+                    </button>
+                    <button 
+                      disabled={!courseTitle || !courseDescription || courseContent.length === 0}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      Preview Course
+                    </button>
+                    <button 
+                      disabled={!courseTitle || !courseDescription || courseContent.length === 0}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-200 flex items-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      Publish Course
                     </button>
                     <button 
                       onClick={resetCourseForm}
